@@ -122,3 +122,13 @@ ul.clean { list-style: none; padding: 0; margin: 0; }
 .bench { display: flex; flex-wrap: wrap; gap: 6px; }
 .bc { width: 76px; }
 .bc.dis { opacity: .45; }
+
+/* Story */
+.tag { display: inline-block; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #111; background: var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 6px; font-weight: 800; }
+.storybox { background: linear-gradient(135deg, #1a3626, #13281c); border-color: #3a6a4c; }
+.storybox p { margin: 0 0 10px; }
+.sheet p { margin: 0 0 10px; }
+.friends { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.fcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; }
+.fcard:hover { border-color: var(--accent); }
+.logrow { padding: 6px 0; border-bottom: 1px solid var(--line); }

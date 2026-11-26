@@ -36,23 +36,26 @@
   function renderStart() {
     $('app').innerHTML = `<div class="start card">
       <h1>⚽ Kreisliga-Karriere</h1>
-      <p class="muted">Starte in der untersten Leipziger Liga und arbeite dich bis in die Bundesliga hoch. Niemand altert, Training und Transfers entscheiden.</p>
+      <p class="muted">Ein Verein steht kurz vor der Auflösung, und deine Freitagsrunde soll ihn retten. Starte in der untersten Leipziger Liga und arbeite dich Kapitel für Kapitel bis in die Bundesliga hoch. Niemand altert, Training und Transfers entscheiden.</p>
       <label>Dein Name (Trainer)</label><input type="text" id="inManager" value="Trainer" maxlength="24">
       <label>Dein Verein</label><input type="text" id="inClub" value="FC Freitagskicker" maxlength="30">
-      <label>Deine Freunde als Spieler (optional, eine Zeile pro Person, Position optional: TW, AB, MF oder ST)</label>
-      <textarea id="inFriends" placeholder="Max Mustermann, ST&#10;Tim&#10;Jonas, TW"></textarea>
+      <label>Deine Freitagsrunde (eine Zeile pro Person, Format: Name, Position mit TW, AB, MF oder ST)</label>
+      <textarea id="inFriends" placeholder="Name, Position">${esc(defaultFriendsText())}</textarea>
       <p class="small muted">Alle anderen Vereine und Spieler sind frei erfunden.</p>
       <button class="btn primary big" data-act="start">Karriere starten</button>
     </div>`;
   }
+  function defaultFriendsText() { return (globalThis.GameData.FRIENDS || []).map(f => `${f.name}, ${f.pos}`).join('\n'); }
   function parseFriends(text) {
+    const prof = {}; (globalThis.GameData.FRIENDS || []).forEach(f => { prof[f.name.toLowerCase()] = f; });
     return String(text || '').split('\n').map(l => l.trim()).filter(Boolean).slice(0, 24).map(l => {
-      const parts = l.split(/[,;]/); return { name: parts[0].trim(), pos: (parts[1] || '').trim() };
+      const parts = l.split(/[,;]/), name = parts[0].trim(), pr = prof[name.toLowerCase()] || {};
+      return Object.assign({}, pr, { name, pos: (parts[1] || '').trim() || pr.pos || '' });
     }).filter(f => f.name);
   }
 
   // ---------- Kopf & Navigation ----------
-  const TABS = [['home', 'Übersicht'], ['squad', 'Kader'], ['lineup', 'Aufstellung'], ['table', 'Tabelle'], ['fixtures', 'Spielplan'], ['transfers', 'Transfers'], ['club', 'Verein']];
+  const TABS = [['home', 'Übersicht'], ['story', 'Story'], ['squad', 'Kader'], ['lineup', 'Aufstellung'], ['table', 'Tabelle'], ['fixtures', 'Spielplan'], ['transfers', 'Transfers'], ['club', 'Verein']];
   function header() {
     const t = E.userTeam(S), lg = E.userLeague(S);
     return `<header class="top"><div><div class="club">${esc(t.name)}</div>
@@ -81,7 +84,7 @@
         <button class="btn primary big" data-act="play">Spieltag starten ▶</button>`;
     }
     const injured = t.players.filter(p => p.injured || p.susp);
-    return `<div class="card"><h3>Nächstes Spiel</h3>${next}</div>
+    return `${chapterCard()}<div class="card"><h3>Nächstes Spiel</h3>${next}</div>
       <div class="grid2">
         <div class="card"><h3>Vorstand</h3>
           <div class="small muted">Saisonziel: ${esc(S.board.objective.label)}</div>
@@ -101,6 +104,27 @@
       <div class="card"><h3>Neuigkeiten</h3><ul class="news clean small">${S.news.slice(0, 8).map(n => `<li>• ${esc(n.text)}</li>`).join('')}</ul></div>`;
   }
 
+  // ---------- Story ----------
+  const capMark = p => (globalThis.Story && S.story && S.story.captainId === p.id) ? ' ©' : '';
+  const paras = txt => String(txt).split('\n\n').map(x => `<p>${esc(x)}</p>`).join('');
+  function chapterCard() {
+    const c = globalThis.Story.chapter(S);
+    return `<div class="card storybox"><div class="tag">Aktuelles Kapitel</div><h3>${esc(c.title)}</h3><p class="small muted">${esc(c.blurb)}</p>
+      <button class="btn sm" data-act="tab" data-v="story">Zur Story</button></div>`;
+  }
+  function storyView() {
+    const Sy = globalThis.Story, c = Sy.chapter(S), t = E.userTeam(S);
+    const friends = t.players.filter(p => p.friend);
+    const log = Sy.log(S);
+    return `<div class="card storybox"><div class="tag">Aktuelles Kapitel</div><h2>${esc(c.title)}</h2><p class="muted">${esc(c.blurb)}</p>
+        ${c.intro.length ? paras(c.intro.join('\n\n')) : '<p class="small muted">Dieses Kapitel hat keinen Vorspann. Du erlebst es gerade, Spieltag für Spieltag.</p>'}</div>
+      <div class="card"><h3>Die Freitagsrunde</h3>${friends.length ? `<div class="friends">${friends.map(p => `<div class="fcard" data-act="player" data-id="${p.id}">
+        <div class="row sb"><b>${esc(p.name)}${capMark(p)}</b>${ovrBadge(E.ovr(p))}</div>
+        <div class="small">${posBadge(p.pos)} <span class="muted">${esc(p.nick || p.trait)}</span></div>
+        <div class="small muted">${esc(p.bio || '')}</div></div>`).join('')}</div>` : '<p class="muted small">Keine Freunde im Kader.</p>'}</div>
+      <div class="card"><h3>Tagebuch</h3>${log.length ? `<ul class="clean small">${log.slice(0, 40).map(l => `<li class="logrow"><span class="muted">${l.season}/${String(l.season + 1).slice(2)}${l.md ? ' · ST ' + l.md : ''}</span><br>${esc(l.text)}</li>`).join('')}</ul>` : '<p class="muted small">Noch keine Einträge.</p>'}</div>`;
+  }
+
   // ---------- Kader ----------
   function sortPlayers(ps) {
     const k = ui.sortKey, d = ui.sortDir;
@@ -113,7 +137,7 @@
     return `<div class="card"><div class="row sb"><h3>Kader (${t.players.length}/${E.SQUAD_MAX})</h3><span class="small muted">Tippe auf einen Spieler für Details</span></div>
       <div class="scroll"><table><tr>${th('pos', 'Pos')}${th('name', 'Name')}${th('ovr', 'Stärke', 'num')}${th('tempo', 'TMP', 'num')}${th('technik', 'TEC', 'num')}${th('kondition', 'KON', 'num')}${th('nerven', 'NER', 'num')}${th('form', 'Form', 'num')}${th('fitness', 'Fit', 'num')}${th('goals', 'Tore', 'num')}<th>Status</th></tr>
       ${sortPlayers(t.players).map(p => `<tr class="click" data-act="player" data-id="${p.id}">
-        <td>${posBadge(p.pos)}</td><td>${p.friend ? '★ ' : ''}${esc(p.name)}</td><td class="num">${ovrBadge(E.ovr(p))}</td>
+        <td>${posBadge(p.pos)}</td><td>${p.friend ? '★ ' : ''}${esc(p.name)}${capMark(p)}</td><td class="num">${ovrBadge(E.ovr(p))}</td>
         <td class="num">${p.tempo}</td><td class="num">${p.technik}</td><td class="num">${p.kondition}</td><td class="num">${p.nerven}</td>
         <td class="num">${Math.round(p.form)}</td><td class="num">${Math.round(p.fitness)}</td><td class="num">${p.goals}</td><td>${status(p)}</td></tr>`).join('')}</table></div></div>`;
   }
@@ -121,6 +145,7 @@
     const t = E.userTeam(S), p = t.players.find(x => x.id === id); if (!p) return;
     const why = E.canSell(S, p);
     openModal(`<div class="row sb"><h2>${p.friend ? '★ ' : ''}${esc(p.name)}</h2><button class="btn sm" data-act="closeModal">✕</button></div>
+      ${p.nick ? `<p style="margin:0"><i>„${esc(p.nick)}“</i>${capMark(p) ? ' · Kapitän' : ''}</p>` : ''}${p.bio ? `<p class="small muted" style="margin:2px 0 6px">${esc(p.bio)}</p>` : ''}
       <p class="muted">${posBadge(p.pos)} ${POSN[p.pos]} · ${esc(p.trait)} · Stärke ${ovrBadge(E.ovr(p))} · Potenzial ${p.pot}</p>
       ${E.STATS.map(k => `<div class="stat"><span class="small" style="width:80px">${E.STAT_LABEL[k]}</span>${bar(p[k])}<b>${p[k]}</b></div>`).join('')}
       <div class="stat"><span class="small" style="width:80px">Form</span>${bar(p.form)}<b>${Math.round(p.form)}</b></div>
@@ -146,7 +171,7 @@
       const e = Math.round(E.eff(p, pos));
       const sel = ui.sel && ui.sel.type === 'slot' && ui.sel.i === i;
       cards.push(`<button class="pc ${sel ? 'sel' : ''} ${p.pos !== pos ? 'oop' : ''}" style="left:${(k + 1) / (arr.length + 1) * 100}%;top:${top[pos]}%" data-act="pickSlot" data-i="${i}">
-        <span class="ovr o${Math.min(9, Math.floor(e / 10))}">${e}</span><span class="pn">${esc(lastName(p.name))}</span><span class="pp">${E.POS_LABEL[p.pos]}${p.friend ? ' ★' : ''}</span></button>`);
+        <span class="ovr o${Math.min(9, Math.floor(e / 10))}">${e}</span><span class="pn">${esc(lastName(p.name))}</span><span class="pp">${E.POS_LABEL[p.pos]}${p.friend ? ' ★' : ''}${capMark(p)}</span></button>`);
     }));
     const used = new Set(t.lineup);
     const bench = E.POS.flatMap(pos => t.players.filter(p => p.pos === pos && !used.has(p.id)).sort((a, b) => E.ovr(b) - E.ovr(a)));
@@ -233,7 +258,7 @@
         <p class="small muted">Gespeichert wird automatisch im Browser nach jedem Spieltag.</p></div>`;
   }
 
-  const VIEWS = { home: homeView, squad: squadView, lineup: lineupView, table: tableView, fixtures: fixturesView, transfers: transfersView, club: clubView };
+  const VIEWS = { home: homeView, story: storyView, squad: squadView, lineup: lineupView, table: tableView, fixtures: fixturesView, transfers: transfersView, club: clubView };
 
   // ---------- Live-Match ----------
   function matchHtml(m) {
@@ -318,7 +343,7 @@
     if (S.phase === 'seasonEnd') { seasonEndModal(); return; }
     const v = E.pendingEvent(S);
     if (!v) return;
-    openModal(`<h2>${esc(v.title)}</h2><p>${esc(v.text)}</p><div class="slots">${v.choices.map((c, i) => `<button class="btn" data-act="choice" data-i="${i}" ${c.disabled ? 'disabled' : ''}>${esc(c.label)}${c.disabled ? ' (zu teuer)' : ''}</button>`).join('')}</div>`);
+    openModal(`${v.tag ? `<div class="tag">${esc(v.tag)}</div>` : ''}<h2>${esc(v.title)}</h2>${paras(v.text)}<div class="slots">${v.choices.map(c => `<button class="btn" data-act="choice" data-i="${c.i}" ${c.disabled ? 'disabled' : ''}>${esc(c.label)}${c.disabled ? ' (zu teuer)' : ''}</button>`).join('')}</div>`);
   }
   function seasonEndModal() {
     const s = S.seasonSummary; if (!s) return;
@@ -327,12 +352,13 @@
       <p>${s.champion ? '🏆 Meister! ' : ''}${s.promoted ? '⬆️ Aufstieg! ' : ''}${s.relegated ? '⬇️ Abstieg. ' : ''}</p>
       <p class="small">Saisonziel „${esc(s.objective)}“: <b>${s.objectiveMet ? 'erreicht ✔' : 'verfehlt ✘'}</b> · Prämie ${money(s.prize)}<br>
       Vertrauen des Vorstands: ${Math.round(s.confidence)}%</p>
+      ${paras(globalThis.Story.outro(S, s).join('\n\n'))}
       ${s.topScorer ? `<p class="small muted">Torschützenkönig der Liga: ${esc(s.topScorer.name)} (${esc(s.topScorer.team)}) mit ${s.topScorer.goals} Toren${s.ownTopScorer ? ` · Bester eigener: ${esc(s.ownTopScorer.name)} (${s.ownTopScorer.goals})` : ''}</p>` : ''}
       ${S.fired ? '<p style="color:var(--red)"><b>Der Vorstand hat das Vertrauen verloren. Du wurdest entlassen.</b></p><button class="btn danger big" data-act="gameover">Weiter</button>'
         : '<button class="btn primary big" data-act="nextSeason">Nächste Saison starten</button>'}`);
   }
   function gameOverModal() {
-    openModal(`<h2>Entlassen</h2><p>Der Vorstand hat sich von dir getrennt. Deine Karriere endet hier – oder fängt neu an.</p>
+    openModal(`<h2>Entlassen</h2><p>${esc(globalThis.Story.firedText(S))}</p>
       <button class="btn primary big" data-act="newgame2">Neue Karriere starten</button>`);
   }
 
@@ -340,6 +366,7 @@
   const act = {
     start() {
       S = E.newGame({ manager: $('inManager').value.trim() || 'Trainer', club: $('inClub').value.trim() || 'FC Freitagskicker', friends: parseFriends($('inFriends').value) });
+      globalThis.Story.ensure(S); globalThis.GameEvents.maybeTrigger(S, true);
       ui.tab = 'home'; save(); render(); showPending();
     },
     tab(d) { ui.sel = null; ui.tab = d.v; render(); window.scrollTo(0, 0); },
@@ -390,8 +417,9 @@
     finish() { finishMatch(); },
     choice(d) {
       const text = E.resolveEvent(S, Number(d.i)); save(); render();
-      openModal(`<p>${esc(text)}</p><button class="btn primary big" data-act="closeModal">Weiter</button>`);
+      openModal(`${paras(text)}<button class="btn primary big" data-act="afterChoice">Weiter</button>`);
     },
+    afterChoice() { closeModal(); showPending(); },
     seasonEnd() { seasonEndModal(); },
     nextSeason() { E.startNextSeason(S); ui.tableTier = null; ui.fixMd = null; save(); closeModal(); render(); window.scrollTo(0, 0); showPending(); },
     gameover() { gameOverModal(); },
@@ -419,7 +447,7 @@
     const el = e.target;
     if (el.id === 'importFile' && el.files && el.files[0]) {
       const r = new FileReader();
-      r.onload = () => { try { const d = JSON.parse(r.result); if (!d.teams || !d.userId) throw new Error('x'); S = d; save(); render(); toast('Spielstand geladen.'); showPending(); } catch (err) { toast('Datei ist kein gültiger Spielstand.'); } };
+      r.onload = () => { try { const d = JSON.parse(r.result); if (!d.teams || !d.userId) throw new Error('x'); S = d; globalThis.Story.ensure(S); save(); render(); toast('Spielstand geladen.'); showPending(); } catch (err) { toast('Datei ist kein gültiger Spielstand.'); } };
       r.readAsText(el.files[0]); return;
     }
     const fn = el.dataset && change[el.dataset.change]; if (fn) fn(el);
@@ -428,6 +456,7 @@
   function init() {
     S = loadSave();
     if (S && (!S.teams || !S.userId)) S = null;
+    if (S) globalThis.Story.ensure(S);
     render();
     if (S) showPending();
   }

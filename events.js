@@ -134,12 +134,90 @@
       ]
     }
   };
+  // ---- Ereignisse rund um die Freunde (nur, wenn die Person im Kader ist) ----
+  const fr = (S, n) => E.userTeam(S).players.find(p => p.friend && p.name === n);
+  const bump = (p, d) => { if (p) p.moral = U.clamp(p.moral + d, 10, 100); };
+  const teamMoral = (S, d) => E.userTeam(S).players.forEach(p => bump(p, d));
+  Object.assign(defs, {
+    lorenzLate: {
+      weight: 1, title: 'Lorenz und die Pünktlichkeit',
+      make: S => fr(S, 'Lorenz') ? {} : null,
+      text: () => 'Lorenz kommt wieder erst zur zweiten Halbzeit des Aufwärmspiels. Die Mannschaft tippt demonstrativ auf die Uhr.',
+      choices: [
+        { label: () => 'Strafrunden anordnen', run: S => { const p = fr(S, 'Lorenz'); if (p) { p.fitness = Math.max(0, p.fitness - 10); bump(p, -3); } teamMoral(S, 2); return 'Lorenz dreht seine Runden und verspricht Besserung. Die Truppe grinst.'; } },
+        { label: () => 'Schulterzucken, er ist ja da', run: S => { bump(fr(S, 'Lorenz'), 6); teamMoral(S, -2); return 'Lorenz strahlt, der Rest murrt ein bisschen.'; } }
+      ]
+    },
+    houmanGrill: {
+      weight: 1, title: 'Houmans Grillabend',
+      make: S => fr(S, 'Houman') ? { cost: Math.round(350 * tierScale(S)) } : null,
+      text: (S, c) => `Houman will nach dem Training den Grill anwerfen. Einkauf: ${money(c.cost)}.`,
+      choices: [
+        { label: (S, c) => `Grillen (${money(c.cost)})`, cost: (S, c) => c.cost, run: (S, c) => { S.budget -= c.cost; S.finance.expense += c.cost; teamMoral(S, 9); S.fans = U.clamp(S.fans + 1, 20, 100); return 'Es wird spät, es wird laut, und am nächsten Tag redet niemand mehr über die letzte Niederlage.'; } },
+        { label: () => 'Diesmal nicht', run: S => { bump(fr(S, 'Houman'), -6); return 'Houman packt den Grill wieder ein, ein bisschen enttäuscht.'; } }
+      ]
+    },
+    georgJohann: {
+      weight: 1, title: 'Streit um den Elfmeter',
+      make: S => (fr(S, 'Georg') && fr(S, 'Johann')) ? {} : null,
+      text: () => 'Georg und Johann streiten, wer den nächsten Elfmeter schießt. Beide sind überzeugt, der Bessere zu sein, und keiner gibt nach.',
+      choices: [
+        { label: () => 'Georg schießt', run: S => { bump(fr(S, 'Georg'), 12); bump(fr(S, 'Johann'), -8); return 'Georg nickt zufrieden. Johann tritt gegen den Ballsack.'; } },
+        { label: () => 'Johann schießt', run: S => { bump(fr(S, 'Johann'), 12); bump(fr(S, 'Georg'), -8); return 'Johann strahlt. Georg schaut demonstrativ in den Himmel.'; } },
+        { label: () => 'Losen', run: S => { teamMoral(S, 2); return 'Eine Münze entscheidet. Beide lachen, der Streit ist vorbei.'; } }
+      ]
+    },
+    arneIdea: {
+      weight: 1, title: 'Arnes neue Idee',
+      make: S => fr(S, 'Arne') ? {} : null,
+      text: () => 'Arne hat nachts eine Taktik skizziert, die „alles verändert“. Er will sie im Training ausprobieren.',
+      choices: [
+        { label: () => 'Ausprobieren', run: S => {
+          if (U.chance(0.6)) { E.userTeam(S).players.filter(p => p.pos === 'MID' || p.pos === 'ATT').forEach(p => { p.form = U.clamp(p.form + 6, 20, 100); }); return 'Die Idee zündet! Mittelfeld und Sturm spielen sich plötzlich Pässe zu, die vorher niemand gesehen hat.'; }
+          teamMoral(S, -4); return 'Die Idee endet im Chaos, drei Spieler laufen in dieselbe Ecke. Arne verspricht eine überarbeitete Version.';
+        } },
+        { label: () => 'Zu riskant', run: S => { bump(fr(S, 'Arne'), -3); return 'Arne faltet seinen Zettel zusammen. „Irgendwann.“'; } }
+      ]
+    },
+    hugoNerves: {
+      weight: 1, title: 'Hugo schläft schlecht',
+      make: S => fr(S, 'Hugo') ? { cost: Math.round(600 * tierScale(S)) } : null,
+      text: (S, c) => `Hugo gibt zu, dass er vor wichtigen Spielen kaum schläft. Ein Mentaltrainer kostet ${money(c.cost)}.`,
+      choices: [
+        { label: (S, c) => `Mentaltraining (${money(c.cost)})`, cost: (S, c) => c.cost, run: (S, c) => { S.budget -= c.cost; S.finance.expense += c.cost; const p = fr(S, 'Hugo'); if (p) { if (p.nerven < 97) p.nerven++; bump(p, 12); } return 'Hugo steht danach merklich ruhiger im Tor.'; } },
+        { label: () => 'Alles gut, Hugo', run: S => { bump(fr(S, 'Hugo'), -2); return 'Hugo nickt. Ob es hilft, wird man sehen.'; } }
+      ]
+    },
+    albertKnee: {
+      weight: 1, title: 'Alberts Knie',
+      make: S => { const p = fr(S, 'Albert'); return (p && !p.injured) ? { cost: Math.round(500 * tierScale(S)) } : null; },
+      text: (S, c) => `Albert hält sich nach dem Training das Knie. Ein Physio könnte nachsehen (${money(c.cost)}).`,
+      choices: [
+        { label: (S, c) => `Zum Physio (${money(c.cost)})`, cost: (S, c) => c.cost, run: (S, c) => { S.budget -= c.cost; S.finance.expense += c.cost; return 'Nur eine Zerrung, nichts Schlimmes. Albert kann weitermachen.'; } },
+        { label: () => 'Wird schon', run: S => { const p = fr(S, 'Albert'); if (p && U.chance(0.5)) { p.injured = 3; return 'Pech: Das Knie macht nicht mit, Albert fällt 2 Spieltage aus.'; } return 'Zum Glück geht es gut.'; } }
+      ]
+    },
+    sprintDuel: {
+      weight: 1, title: 'Sprintduell',
+      make: S => (fr(S, 'Frederik') && fr(S, 'Lino')) ? {} : null,
+      text: () => 'Frederik fordert Lino zu einem Sprintduell über 50 Meter heraus. Die ganze Mannschaft will zusehen.',
+      choices: [
+        { label: () => 'Rennen veranstalten', run: S => {
+          const f = fr(S, 'Frederik'), l = fr(S, 'Lino'); [f, l].forEach(p => { p.form = U.clamp(p.form + 5, 20, 100); bump(p, 4); });
+          if (U.chance(0.2)) { const v = U.pick([f, l]); v.injured = 2; return `Ein Sprint wie im Fernsehen, aber ${v.name} zieht sich dabei eine Zerrung zu und fällt 1 Spieltag aus.`; }
+          return 'Zielfoto-Entscheidung! Beide sind danach bestens gelaunt.';
+        } },
+        { label: () => 'Lieber nicht', run: () => 'Das Duell wird verschoben, was niemand glaubt.' }
+      ]
+    }
+  });
   function require_base(tier) { return globalThis.GameData.TIER_BASE[tier - 1]; }
 
   function maybeTrigger(S, force) {
     if (S.pending || S.fired) return;
+    if (globalThis.Story && globalThis.Story.check(S)) return;
     if (!force && !U.chance(0.28)) return;
-    const ids = Object.keys(defs);
+    const ids = Object.keys(defs).filter(k => !defs[k].story); // Story-Szenen laufen nur über Story.check
     for (let tries = 0; tries < 5; tries++) {
       const id = U.wpick(ids, ids.map(k => defs[k].weight));
       const ctx = defs[id].make(S);
@@ -149,25 +227,28 @@
   function pendingView(S) {
     if (!S.pending) return null;
     const d = defs[S.pending.id], c = S.pending.ctx;
+    if (!d) { S.pending = null; return null; }
+    const val = x => typeof x === 'function' ? x(S, c) : x;
     return {
-      title: d.title, text: d.text(S, c),
-      choices: d.choices.map(ch => {
+      title: val(d.title), tag: val(d.tag) || '', story: !!d.story, text: d.text(S, c),
+      choices: d.choices.map((ch, i) => ({ ch, i })).filter(x => !x.ch.show || x.ch.show(S, c)).map(({ ch, i }) => {
         const cost = ch.cost ? ch.cost(S, c) : 0;
-        return { label: ch.label(S, c), disabled: cost > S.budget, cost };
+        return { i, label: ch.label(S, c), disabled: cost > 0 && cost > S.budget, cost };
       })
     };
   }
   function resolve(S, idx) {
     if (!S.pending) return '';
-    const d = defs[S.pending.id], ch = d.choices[idx];
-    const cost = ch.cost ? ch.cost(S, S.pending.ctx) : 0;
-    if (cost > S.budget) return 'Dafür fehlt das Geld.';
-    const text = ch.run(S, S.pending.ctx);
-    S.pending = null;
+    const prev = S.pending, d = defs[prev.id], ch = d && d.choices[idx];
+    if (!ch) { S.pending = null; return ''; }
+    const cost = ch.cost ? ch.cost(S, prev.ctx) : 0;
+    if (cost > 0 && cost > S.budget) return 'Dafür fehlt das Geld.';
+    const text = ch.run(S, prev.ctx);
+    if (S.pending === prev) S.pending = null; // eine Szene darf die nächste setzen
     return text;
   }
 
-  globalThis.GameEvents = { maybeTrigger };
+  globalThis.GameEvents = { maybeTrigger, register: (id, def) => { defs[id] = def; } };
   E.pendingEvent = pendingView;
   E.resolveEvent = resolve;
 })();
