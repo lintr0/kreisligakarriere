@@ -10,7 +10,7 @@
 
   let S = null;
   let live = null;
-  const ui = { tab: 'home', sortKey: 'pos', sortDir: 1, tableTier: null, fixMd: null };
+  const ui = { sel: null, tab: 'home', sortKey: 'pos', sortDir: 1, tableTier: null, fixMd: null };
 
   // ---------- Speichern ----------
   function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* voll oder gesperrt */ } }
@@ -132,29 +132,46 @@
   }
 
   // ---------- Aufstellung ----------
+  const lastName = n => { const w = String(n).trim().split(' '); return w.length > 1 ? w.slice(1).join(' ') : w[0]; };
   function lineupView() {
     const t = E.userTeam(S); E.fixLineup(t);
     const slots = E.slotsOf(t.formation);
     const strg = E.lineupStrength(t, t.lineup, t.formation, t.tactic);
-    const opts = slot => E.POS.flatMap(pos => t.players.filter(p => p.pos === pos).sort((a, b) => E.ovr(b) - E.ovr(a))).map(p => {
-      const dis = p.injured || p.susp;
-      return `<option value="${p.id}" ${dis ? 'disabled' : ''} {SEL${p.id}}>${esc(p.name)} (${E.POS_LABEL[p.pos]} ${Math.round(E.eff(p, slot))})${p.injured ? ' 🚑' : p.susp ? ' ⛔' : ''}</option>`;
-    }).join('');
+    const rows = { GK: [], DEF: [], MID: [], ATT: [] };
+    slots.forEach((s, i) => rows[s].push(i));
+    const top = { ATT: 14, MID: 39, DEF: 64, GK: 87 };
+    const cards = [];
+    E.POS.forEach(pos => rows[pos].forEach((i, k, arr) => {
+      const p = t.players.find(x => x.id === t.lineup[i]);
+      const e = Math.round(E.eff(p, pos));
+      const sel = ui.sel && ui.sel.type === 'slot' && ui.sel.i === i;
+      cards.push(`<button class="pc ${sel ? 'sel' : ''} ${p.pos !== pos ? 'oop' : ''}" style="left:${(k + 1) / (arr.length + 1) * 100}%;top:${top[pos]}%" data-act="pickSlot" data-i="${i}">
+        <span class="ovr o${Math.min(9, Math.floor(e / 10))}">${e}</span><span class="pn">${esc(lastName(p.name))}</span><span class="pp">${E.POS_LABEL[p.pos]}${p.friend ? ' ★' : ''}</span></button>`);
+    }));
     const used = new Set(t.lineup);
-    const bench = t.players.filter(p => !used.has(p.id));
+    const bench = E.POS.flatMap(pos => t.players.filter(p => p.pos === pos && !used.has(p.id)).sort((a, b) => E.ovr(b) - E.ovr(a)));
     return `<div class="grid2">
-      <div class="card"><h3>Formation</h3>
-        <select data-change="formation">${Object.keys(E.FORMATIONS).map(f => `<option ${t.formation === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
-        <h3 style="margin-top:12px">Taktik</h3>
-        <div class="seg">${Object.keys(E.TACTICS).map(k => `<button class="${t.tactic === k ? 'on' : ''}" data-act="tactic" data-v="${k}">${E.TACTICS[k].label}</button>`).join('')}</div>
-        <h3 style="margin-top:12px">Stärke</h3>
-        <div class="stat"><span class="small" style="width:80px">Angriff</span>${bar(Math.round(strg.attack))}<b>${Math.round(strg.attack)}</b></div>
-        <div class="stat"><span class="small" style="width:80px">Kontrolle</span>${bar(Math.round(strg.control))}<b>${Math.round(strg.control)}</b></div>
-        <div class="stat"><span class="small" style="width:80px">Abwehr</span>${bar(Math.round(strg.defense))}<b>${Math.round(strg.defense)}</b></div>
-        <div style="margin-top:10px"><button class="btn" data-act="autoLineup">Automatisch aufstellen</button></div>
+      <div class="card"><h3>Startelf – ${t.formation}</h3>
+        <div class="pitch"><div class="mid"></div><div class="circ"></div><div class="box t"></div><div class="box b"></div>${cards.join('')}</div>
+        <p class="small muted center">Tippe einen Spieler an und dann einen zweiten (Feld oder Bank), um sie zu tauschen. Rot gestrichelt = auf fremder Position.</p>
       </div>
-      <div class="card"><h3>Startelf</h3><div class="slots">${slots.map((s, i) => `<div class="slot">${posBadge(s)}<select data-change="slot" data-i="${i}">${opts(s).replace(/\{SEL([^}]+)\}/g, (m, id) => id === t.lineup[i] ? 'selected' : '')}</select></div>`).join('')}</div>
-        <h3 style="margin-top:12px">Bank & Rest</h3><p class="small muted">${bench.map(p => `${esc(p.name)} (${E.POS_LABEL[p.pos]} ${E.ovr(p)})${p.injured ? ' 🚑' : p.susp ? ' ⛔' : ''}`).join(' · ') || '–'}</p>
+      <div>
+        <div class="card"><h3>Formation</h3>
+          <select data-change="formation">${Object.keys(E.FORMATIONS).map(f => `<option ${t.formation === f ? 'selected' : ''}>${f}</option>`).join('')}</select>
+          <h3 style="margin-top:12px">Taktik</h3>
+          <div class="seg">${Object.keys(E.TACTICS).map(k => `<button class="${t.tactic === k ? 'on' : ''}" data-act="tactic" data-v="${k}">${E.TACTICS[k].label}</button>`).join('')}</div>
+          <h3 style="margin-top:12px">Stärke</h3>
+          <div class="stat"><span class="small" style="width:80px">Angriff</span>${bar(Math.round(strg.attack))}<b>${Math.round(strg.attack)}</b></div>
+          <div class="stat"><span class="small" style="width:80px">Kontrolle</span>${bar(Math.round(strg.control))}<b>${Math.round(strg.control)}</b></div>
+          <div class="stat"><span class="small" style="width:80px">Abwehr</span>${bar(Math.round(strg.defense))}<b>${Math.round(strg.defense)}</b></div>
+          <div style="margin-top:10px"><button class="btn" data-act="autoLineup">Automatisch aufstellen</button></div>
+        </div>
+        <div class="card" style="margin-top:12px"><h3>Bank & Reserve</h3>
+          <div class="bench">${bench.map(p => {
+            const dis = p.injured || p.susp, sel = ui.sel && ui.sel.type === 'bench' && ui.sel.id === p.id;
+            return `<button class="bc ${dis ? 'dis' : ''} ${sel ? 'sel' : ''}" data-act="pickBench" data-id="${p.id}"><span class="ovr o${Math.min(9, Math.floor(E.ovr(p) / 10))}">${E.ovr(p)}</span><span class="pn">${esc(lastName(p.name))}</span><span class="pp">${E.POS_LABEL[p.pos]}${p.friend ? ' ★' : ''} ${p.injured ? '🚑' : p.susp ? '⛔' : ''}</span></button>`;
+          }).join('') || '<span class="muted small">Keine Reservespieler.</span>'}</div>
+        </div>
       </div></div>`;
   }
 
@@ -325,7 +342,7 @@
       S = E.newGame({ manager: $('inManager').value.trim() || 'Trainer', club: $('inClub').value.trim() || 'FC Freitagskicker', friends: parseFriends($('inFriends').value) });
       ui.tab = 'home'; save(); render(); showPending();
     },
-    tab(d) { ui.tab = d.v; render(); window.scrollTo(0, 0); },
+    tab(d) { ui.sel = null; ui.tab = d.v; render(); window.scrollTo(0, 0); },
     play() { startMatch(); },
     sort(d) { if (ui.sortKey === d.v) ui.sortDir *= -1; else { ui.sortKey = d.v; ui.sortDir = (d.v === 'name' || d.v === 'pos') ? 1 : -1; } render(); },
     player(d) { showPlayer(d.id); },
@@ -333,7 +350,28 @@
     sell(d) { const r = E.sell(S, d.id); toast(r.msg); if (r.ok) { closeModal(); save(); render(); } },
     buy(d) { const r = E.buy(S, d.id); toast(r.msg); if (r.ok) { save(); render(); } },
     tactic(d) { E.userTeam(S).tactic = d.v; save(); render(); },
-    autoLineup() { E.autoLineup(S); save(); render(); },
+    autoLineup() { E.autoLineup(S); ui.sel = null; save(); render(); },
+    pickSlot(d) {
+      const t = E.userTeam(S), i = Number(d.i), s = ui.sel;
+      if (!s) ui.sel = { type: 'slot', i };
+      else if (s.type === 'slot') { if (s.i !== i) { E.setSlot(S, i, t.lineup[s.i]); save(); } ui.sel = null; }
+      else {
+        const p = t.players.find(x => x.id === s.id);
+        if (p && (p.injured || p.susp)) toast('Dieser Spieler ist verletzt oder gesperrt.');
+        else { E.setSlot(S, i, s.id); save(); }
+        ui.sel = null;
+      }
+      render();
+    },
+    pickBench(d) {
+      const t = E.userTeam(S), p = t.players.find(x => x.id === d.id), s = ui.sel;
+      if (!p) return;
+      if (s && s.type === 'slot') {
+        if (p.injured || p.susp) { toast('Dieser Spieler ist verletzt oder gesperrt.'); return; }
+        E.setSlot(S, s.i, p.id); ui.sel = null; save();
+      } else ui.sel = (s && s.type === 'bench' && s.id === d.id) ? null : { type: 'bench', id: d.id };
+      render();
+    },
     speed(d) { if (!live) return; live.speed = d.v; setCtl(); },
     tactics() { openTactics(); },
     mTactic(d) { E.setMatchTactic(live.m, live.key, d.v); E.userTeam(S).tactic = d.v; openTactics(); },
@@ -366,7 +404,7 @@
   };
   const change = {
     training(el) { S.training = el.value; save(); },
-    formation(el) { E.setFormation(S, el.value); save(); render(); },
+    formation(el) { ui.sel = null; E.setFormation(S, el.value); save(); render(); },
     slot(el) { E.setSlot(S, Number(el.dataset.i), el.value); save(); render(); },
     tableTier(el) { ui.tableTier = Number(el.value); render(); },
     fixMd(el) { ui.fixMd = Number(el.value); render(); }

@@ -103,3 +103,22 @@ ul.clean { list-style: none; padding: 0; margin: 0; }
 .bars span.k { display: inline-block; width: 78px; font-size: 12.5px; color: var(--muted); }
 .stat { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
 .stat .bar { flex: 1; }
+
+/* Taktikfeld */
+.pitch { position: relative; width: 100%; max-width: 520px; aspect-ratio: 3 / 4; margin: 8px auto; border-radius: 14px; border: 2px solid rgba(255,255,255,.25); overflow: hidden;
+  background: repeating-linear-gradient(180deg, #1f6b3a 0 12.5%, #2a7d46 12.5% 25%); }
+.pitch::before { content: ''; position: absolute; inset: 3%; border: 2px solid rgba(255,255,255,.35); border-radius: 4px; }
+.pitch .mid { position: absolute; left: 3%; right: 3%; top: 50%; border-top: 2px solid rgba(255,255,255,.35); }
+.pitch .circ { position: absolute; left: 50%; top: 50%; width: 24%; aspect-ratio: 1; border: 2px solid rgba(255,255,255,.35); border-radius: 50%; transform: translate(-50%, -50%); }
+.pitch .box { position: absolute; left: 25%; right: 25%; height: 13%; border: 2px solid rgba(255,255,255,.35); }
+.pitch .box.t { top: 3%; border-top: 0; } .pitch .box.b { bottom: 3%; border-bottom: 0; }
+.pc, .bc { display: flex; flex-direction: column; align-items: center; gap: 1px; background: rgba(8, 22, 14, .88); border: 2px solid transparent; border-radius: 10px; padding: 4px 2px; color: var(--text); cursor: pointer; font-size: 10.5px; line-height: 1.15; }
+.pc { position: absolute; transform: translate(-50%, -50%); width: 17%; min-width: 52px; }
+.pc .ovr, .bc .ovr { font-size: 14px; }
+.pn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.pp { color: var(--muted); font-size: 10px; }
+.pc.sel, .bc.sel { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242, 193, 78, .35); }
+.pc.oop { border: 2px dashed var(--red); }
+.bench { display: flex; flex-wrap: wrap; gap: 6px; }
+.bc { width: 76px; }
+.bc.dis { opacity: .45; }
