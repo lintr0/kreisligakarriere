@@ -88,15 +88,16 @@
     const pos = o.pos || pick(POSPOOL);
     const b = base + rnd(-7, 7);
     const bo = BONUS[pos];
-    const mk = k => clamp(Math.round(b + rnd(-9, 9) + bo[k]), 12, 96);
+    const mk = k => clamp(Math.round(b + rnd(-9, 9) + bo[k] + ((o.bias && o.bias[k]) || 0)), 12, 96);
     const p = {
       id: newId('p'), name: o.name || genName(), pos,
       tempo: mk('tempo'), technik: mk('technik'), kondition: mk('kondition'), nerven: mk('nerven'),
       pot: 0, form: 60, fitness: 100, moral: 70, injured: 0, susp: 0, yellows: 0,
       goals: 0, assists: 0, apps: 0, ratingSum: 0, careerGoals: 0, careerApps: 0,
-      trait: pick(TRAITS), friend: !!o.friend
+      trait: (o.trait && TRAITS.includes(o.trait)) ? o.trait : pick(TRAITS), friend: !!o.friend, nick: o.nick || '', bio: o.bio || ''
     };
     p.pot = clamp(ovr(p) + rnd(2, 16), 20, 97);
+    if (o.friend) p.pot = clamp(ovr(p) + rnd(14, 28), 30, 94);
     if (o.pot) p.pot = Math.max(p.pot, o.pot);
     return p;
   }
@@ -116,7 +117,7 @@
         if (!pos) pos = cycle[ci++ % cycle.length];
       }
       if (counts[pos] > 0) counts[pos]--;
-      out.push(genPlayer(base, { name: String(f.name).slice(0, 28), pos, friend: true }));
+      out.push(genPlayer(base, { name: String(f.name).slice(0, 28), pos, friend: true, nick: f.nick, bio: f.bio, trait: f.trait, bias: f.bias }));
     });
     POS.forEach(pos => { for (let i = 0; i < counts[pos]; i++) out.push(genPlayer(base, { pos })); });
     return out;
